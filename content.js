@@ -1,12 +1,18 @@
 (() => {
   let popup = null;
   let currentWord = '';
+  let currentSourceLang = 'DE';
   let currentTranslation = '';
   let hideTimer = null;
 
   const SPEAKER_SVG = `
     <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
       <path d="M10 3.5a.75.75 0 0 0-1.264-.545L5.203 6H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.203l3.533 3.045A.75.75 0 0 0 10 16.5V3.5zM14.4 6.175a.75.75 0 0 1 1.06.065A6.97 6.97 0 0 1 17 10a6.97 6.97 0 0 1-1.54 4.36.75.75 0 1 1-1.125-.994A5.47 5.47 0 0 0 15.5 10a5.47 5.47 0 0 0-1.165-3.366.75.75 0 0 1 .065-1.059zM12.2 8.43a.75.75 0 0 1 1.06.07A3.98 3.98 0 0 1 14.25 10a3.98 3.98 0 0 1-.99 2.6.75.75 0 1 1-1.13-.99A2.48 2.48 0 0 0 12.75 10a2.48 2.48 0 0 0-.62-1.51.75.75 0 0 1 .07-1.06z"/>
+    </svg>`;
+
+  const BOOKMARK_SVG = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
     </svg>`;
 
   // ── Create popup DOM ──────────────────────────────────────────────────────
@@ -16,7 +22,7 @@
     el.innerHTML = `
       <div class="dep-inner">
         <div class="dep-header">
-          <span class="dep-lang-badge">DE</span>
+          <span class="dep-lang-badge" id="dep-src-badge">DE</span>
           <span class="dep-arrow">→</span>
           <span class="dep-lang-badge en">EN</span>
           <button class="dep-close" title="Close">✕</button>
@@ -24,6 +30,7 @@
         <div class="dep-word-row">
           <div class="dep-word"></div>
           <button class="dep-speak-btn" title="Pronounce (or press Ctrl)">${SPEAKER_SVG}</button>
+          <button class="dep-bookmark-btn" title="Save to bookmarks">${BOOKMARK_SVG}</button>
         </div>
         <div class="dep-divider"></div>
         <div class="dep-translation"></div>
@@ -41,6 +48,22 @@
         clearTimeout(hideTimer);
         pronounce(currentWord);
         scheduleHide(5000);
+      }
+    });
+    el.querySelector('.dep-bookmark-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (currentWord && currentTranslation) {
+        const { bookmarks = [] } = await chrome.storage.local.get('bookmarks');
+        if (!bookmarks.find(b => b.w === currentWord)) {
+          bookmarks.push({ 
+            w: currentWord, 
+            t: currentTranslation, 
+            sl: currentSourceLang,
+            d: new Date().toLocaleDateString() 
+          });
+          await chrome.storage.local.set({ bookmarks });
+          el.querySelector('.dep-bookmark-btn').classList.add('active');
+        }
       }
     });
     el.addEventListener('mouseenter', () => clearTimeout(hideTimer));
@@ -83,9 +106,12 @@
   // ── Show / hide ───────────────────────────────────────────────────────────
   function showPopup(x, y, word, translation) {
     const el = getPopup();
+    const targetBadge = el.querySelector('.dep-lang-badge.en');
     el.querySelector('.dep-word').textContent = word;
     el.querySelector('.dep-translation').textContent = translation;
+    el.querySelector('#dep-src-badge').textContent = currentSourceLang.toUpperCase();
     el.classList.remove('dep-loading', 'dep-error', 'dep-visible');
+    el.querySelector('.dep-bookmark-btn').classList.remove('active');
 
     positionPopup(el, x, y);
     el.classList.add('dep-visible');
@@ -128,14 +154,18 @@
   const cache = {};
 
   async function translate(word) {
-    if (cache[word]) return cache[word];
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=de|en`;
+    const { targetLang = 'en' } = await chrome.storage.local.get('targetLang');
+    const cacheKey = `${word}:${targetLang}`;
+    if (cache[cacheKey]) return cache[cacheKey];
+
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=autodetect|${targetLang}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Network error');
     const data = await res.json();
     const translation = data?.responseData?.translatedText;
     if (!translation || translation.toLowerCase() === word.toLowerCase()) throw new Error('No translation found');
-    cache[word] = translation;
+    currentSourceLang = data?.responseData?.matchedLanguage || '??';
+    cache[cacheKey] = translation;
     return translation;
   }
 

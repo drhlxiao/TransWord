@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DE→EN Translator",
+  "name": "Any→Target Translator",
   "version": "1.0",
-  "description": "Double-click any German word to see its English translation. Press Ctrl to hear it pronounced.",
+  "description": "Double-click any word to translate. Press Ctrl to hear it. Bookmark and export words via the toolbar.",
   "permissions": [
     "activeTab",
     "storage"
@@ -23,10 +23,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
+    "default_popup": "toolbar.html",
+    "default_title": "Translation Settings & Export"
   }
 }

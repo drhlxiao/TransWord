@@ -146,6 +146,32 @@
   fill: #7c3aed;
 }
 
+/* ── Bookmark button ── */
+.dep-bookmark-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.13s;
+  padding: 0;
+}
+
+.dep-bookmark-btn:hover {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.dep-bookmark-btn.active {
+  background: #ffedd5;
+  border-color: #fb923c;
+}
+
 /* Pulsing ring while speaking */
 #de-en-popup.dep-speaking .dep-speak-btn {
   background: #ede9fe;
