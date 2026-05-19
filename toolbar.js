@@ -1,13 +1,22 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  const select = document.getElementById('targetLang');
+  const targetLangOption = document.getElementById('targetLang');
+  const sourceLangOption = document.getElementById('sourceLang');
   const exportBtn = document.getElementById('exportBtn');
 
   // Load current target language
   const { targetLang = 'en' } = await chrome.storage.local.get('targetLang');
-  select.value = targetLang;
+  targetLangOption.value = targetLang;
 
-  select.addEventListener('change', () => {
-    chrome.storage.local.set({ targetLang: select.value });
+  // Load current source language
+  const { sourceLang = 'autodetect' } = await chrome.storage.local.get('sourceLang');
+  sourceLangOption.value = sourceLang;
+
+  targetLangOption.addEventListener('change', () => {
+    chrome.storage.local.set({ targetLang: targetLangOption.value });
+  });
+
+  sourceLangOption.addEventListener('change', () => {
+    chrome.storage.local.set({ sourceLang: sourceLangOption.value });
   });
 
   exportBtn.addEventListener('click', async () => {

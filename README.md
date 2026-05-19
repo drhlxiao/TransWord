@@ -1,18 +1,19 @@
-# HlTranslator  -- A word translator for chrome
+# TransWord  — A word translation Chrome extension for language learners
 
-A lightweight browser extension designed for language learners. Double-click any word on a webpage to see an instant translation, hear its pronunciation, and save it to your personal vocabulary list.
+A lightweight chrome-like browser extension designed for language learners. 
+Double-click any word on a webpage to see an instant translation, hear its pronunciation, and save it to your personal vocabulary list.
 
 ## Features
 
 - **Instant Translation**: Double-click any word to trigger a popup translation.
-- **Automatic Language Detection**: Powered by the MyMemory API, the extension automatically detects the source language.
+- **Automatic Language Detection**: Powered by the LibreTranslate API, the extension automatically detects the source language.
 - **Text-to-Speech (TTS)**: Hear the word pronounced by clicking the speaker icon or pressing the `Ctrl` key.
 - **Vocabulary Bookmarks**: Save interesting words to your local storage with a single click on the bookmark icon.
 - **CSV Export**: Manage your learning by exporting your bookmarked words (including word, translation, source language, and date) to a CSV file.
 - **Customizable Target Language**: Set your preferred target language (English, German, French, Spanish, or Chinese) via the toolbar popup.
-
+It uses https://api.mymemory.translated.net/ for translation 
 ## Installation
-
+It uses https://libretranslate.com/ for translation.
 1.  Clone this repository or download the source code to your local machine.
 2.  Open Google Chrome (or any Chromium-based browser like Edge or Brave).
 3.  Navigate to `chrome://extensions/`.
@@ -36,4 +37,7 @@ A lightweight browser extension designed for language learners. Double-click any
 
 ## License
 
-MIT
+GPLv3
+
+## Author
+drhlxiao

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Any→Target Translator",
-  "version": "1.0",
+  "name": "TransWord",
+  "version": "1.2",
   "description": "Double-click any word to translate. Press Ctrl to hear it. Bookmark and export words via the toolbar.",
   "permissions": [
     "activeTab",

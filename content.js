@@ -1,9 +1,11 @@
 (() => {
   let popup = null;
   let currentWord = '';
-  let currentSourceLang = 'DE';
+  let currentSourceLang = 'en';
   let currentTranslation = '';
   let hideTimer = null;
+  let targetLang = 'en';   // ← FIX 1: module-level so showPopup can read it
+  let sourceLang = 'autodetect';
 
   const SPEAKER_SVG = `
     <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
@@ -24,7 +26,7 @@
         <div class="dep-header">
           <span class="dep-lang-badge" id="dep-src-badge">DE</span>
           <span class="dep-arrow">→</span>
-          <span class="dep-lang-badge en">EN</span>
+          <span id="dep-target-lang-badge" class="dep-lang-badge en">EN</span>
           <button class="dep-close" title="Close">✕</button>
         </div>
         <div class="dep-word-row">
@@ -55,11 +57,11 @@
       if (currentWord && currentTranslation) {
         const { bookmarks = [] } = await chrome.storage.local.get('bookmarks');
         if (!bookmarks.find(b => b.w === currentWord)) {
-          bookmarks.push({ 
-            w: currentWord, 
-            t: currentTranslation, 
+          bookmarks.push({
+            w: currentWord,
+            t: currentTranslation,
             sl: currentSourceLang,
-            d: new Date().toLocaleDateString() 
+            d: new Date().toLocaleDateString()
           });
           await chrome.storage.local.set({ bookmarks });
           el.querySelector('.dep-bookmark-btn').classList.add('active');
@@ -81,19 +83,17 @@
 
   // ── Positioning helper ────────────────────────────────────────────────────
   function positionPopup(el, x, y) {
-    // Set initial state to calculate dimensions without being seen
     el.style.display = 'block';
     el.style.visibility = 'hidden';
 
     const rect = el.getBoundingClientRect();
     const W = rect.width;
-    const H = rect.height;
     const vw = window.innerWidth;
     const scrollX = window.scrollX;
     const scrollY = window.scrollY;
 
     let left = x + scrollX - W / 2;
-    let top = y + scrollY - H - 14;
+    let top = y + scrollY - rect.height - 14;
 
     if (left < scrollX + 8) left = scrollX + 8;
     if (left + W > scrollX + vw - 8) left = scrollX + vw - W - 8;
@@ -105,13 +105,13 @@
   }
 
   // ── Show / hide ───────────────────────────────────────────────────────────
-  function showPopup(x, y, word, translation) {
+  function showPopup(x, y, word, translation, srcLang, destLang) {
     const el = getPopup();
     el.querySelector('.dep-word').textContent = word;
     el.querySelector('.dep-translation').textContent = translation;
-    el.querySelector('#dep-src-badge').textContent = currentSourceLang.toUpperCase();
-    
-    // Only add dep-visible AFTER positioning to trigger the entrance transition smoothly
+    el.querySelector('#dep-src-badge').textContent = srcLang.toUpperCase();
+    el.querySelector('#dep-target-lang-badge').textContent = destLang.toUpperCase(); // ← now works
+
     el.classList.remove('dep-loading', 'dep-error');
     el.querySelector('.dep-bookmark-btn').classList.remove('active');
 
@@ -152,35 +152,79 @@
     hideTimer = setTimeout(hidePopup, ms);
   }
 
-  // ── Translation ───────────────────────────────────────────────────────────
   const cache = {};
 
   async function translate(word) {
-    const { targetLang = 'en' } = await chrome.storage.local.get('targetLang');
-    const cacheKey = `${word}:${targetLang}`;
-    if (cache[cacheKey]) return cache[cacheKey];
+  const stored = await chrome.storage.local.get(['targetLang', 'sourceLang']);
+  targetLang = stored.targetLang || 'en';
+  sourceLang = stored.sourceLang || 'autodetect';
 
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=autodetect|${targetLang}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Network error');
-    const data = await res.json();
-    const translation = data?.responseData?.translatedText;
-    if (!translation || translation.toLowerCase() === word.toLowerCase()) throw new Error('No translation found');
-    currentSourceLang = data?.responseData?.matchedLanguage || '??';
-    cache[cacheKey] = translation;
-    return translation;
+  const cacheKey = `${word}:${sourceLang}:${targetLang}`;
+
+  if (sourceLang === targetLang) {
+    currentSourceLang = sourceLang;
+    return word;
   }
+
+  if (cache[cacheKey]) {
+    currentSourceLang = cache[cacheKey].sl;
+    return cache[cacheKey].t;
+  }
+
+  // ← MyMemory's keyword for auto-detect is "auto", not "autodetect"
+  const srcCode = (sourceLang === 'autodetect') ? 'autodetect' : sourceLang;
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${srcCode}|${targetLang}`;
+  console.log(`[TransWord] API URL: ${url}`);
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Network error: ${res.status}`);
+  const data = await res.json();
+  console.log('[TransWord] API Response:', data);
+
+  if (data.responseStatus !== 200) throw new Error(data.responseDetails || 'API error');
+
+  const translation = data?.responseData?.translatedText;
+  if (!translation || translation.trim() === '') throw new Error('Empty translation');
+
+  // ← Correct field: responseData.detectedSourceLanguage (not matches[0].source)
+  const detected = data?.responseData?.detectedLanguage;
+  if (detected ){
+    if(detected.length >= 2) {
+    currentSourceLang = detected.split('-')[0].toLowerCase(); // "DE-DE" → "de"
+    } else {
+      currentSourceLang = detected.toLowerCase();
+    }
+  } else {
+    currentSourceLang = (sourceLang !== 'autodetect') ? sourceLang : 'en';
+  }
+
+  cache[cacheKey] = { t: translation, sl: currentSourceLang };
+  return {'text': translation, 'srcLang': currentSourceLang, 'destLang': targetLang};
+}
 
   // ── Pronunciation ─────────────────────────────────────────────────────────
   function pronounce(word) {
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(word);
-    utter.lang = 'de-DE';
+    const src = (currentSourceLang || 'en').toString().toLowerCase().split('-')[0];
+
+    const langMap = {
+      en: 'en-US', de: 'de-DE', fr: 'fr-FR', es: 'es-ES',
+      zh: 'zh-CN', ja: 'ja-JP', ko: 'ko-KR', pt: 'pt-PT',
+      ru: 'ru-RU', it: 'it-IT', nl: 'nl-NL'
+    };
+
+    utter.lang = langMap[src] || (src.length === 2 ? src : 'en-US');
     utter.rate = 0.9;
 
+    console.log(`[TransWord] Pronouncing: "${word}" with lang "${utter.lang}"`);
     const voices = window.speechSynthesis.getVoices();
-    const germanVoice = voices.find(v => v.lang.startsWith('de'));
-    if (germanVoice) utter.voice = germanVoice;
+    const lowerLang = utter.lang.toLowerCase();
+    const pref = voices.find(v =>
+      lowerLang === v.lang.toLowerCase() ||
+      v.lang.toLowerCase().startsWith(lowerLang.slice(0, 2))
+    );
+    if (pref) utter.voice = pref;
 
     const el = getPopup();
     el.classList.add('dep-speaking');
@@ -205,8 +249,9 @@
     try {
       const translation = await translate(word);
       currentTranslation = translation;
-      showPopup(e.clientX, e.clientY, word, translation);
-    } catch {
+      showPopup(e.clientX, e.clientY, word, translation.text, translation.srcLang, translation.destLang);
+    } catch (err) {
+      console.error('[TransWord] Error:', err);
       showError('Translation unavailable');
     }
   });
@@ -220,7 +265,6 @@
     if (e.key === 'Escape') hidePopup();
   });
 
-  // Pre-load voices
   if (window.speechSynthesis) {
     window.speechSynthesis.getVoices();
     window.speechSynthesis.addEventListener('voiceschanged', () => {
