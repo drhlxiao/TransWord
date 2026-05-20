@@ -6,7 +6,7 @@ Double-click any word on a webpage to see an instant translation, hear its pronu
 ## Features
 
 - **Instant Translation**: Double-click any word to trigger a popup translation.
-- **Automatic Language Detection**: Powered by the LibreTranslate API, the extension automatically detects the source language.
+- **Automatic Language Detection**: Powered by the myMemory API, the extension automatically detects the source language.
 - **Text-to-Speech (TTS)**: Hear the word pronounced by clicking the speaker icon or pressing the `Ctrl` key.
 - **Vocabulary Bookmarks**: Save interesting words to your local storage with a single click on the bookmark icon.
 - **CSV Export**: Manage your learning by exporting your bookmarked words (including word, translation, source language, and date) to a CSV file.
