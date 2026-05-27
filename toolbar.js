@@ -3,6 +3,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sourceLangOption = document.getElementById('sourceLang');
   const exportBtn = document.getElementById('exportBtn');
 
+  // Create a simple toast container
+  const toastContainer = document.createElement('div');
+  toastContainer.id = 'tw-toast-container';
+  Object.assign(toastContainer.style, {
+    position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999
+  });
+  document.body.appendChild(toastContainer);
+
+  function showToast(msg, ms = 3000) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    Object.assign(t.style, {
+      background: 'rgba(15,23,42,0.9)', color: '#fff', padding: '8px 12px',
+      borderRadius: '8px', marginTop: '8px', boxShadow: '0 6px 18px rgba(2,6,23,0.2)',
+      fontSize: '13px', maxWidth: '320px'
+    });
+    toastContainer.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(-6px)'; }, ms - 300);
+    setTimeout(() => { toastContainer.removeChild(t); }, ms);
+  }
+
   // Storage helpers: prefer chrome.storage.sync -> chrome.storage.local -> localStorage
   async function storageGet(keys) {
     try {
@@ -50,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   exportBtn.addEventListener('click', async () => {
     const { bookmarks = [] } = await storageGet('bookmarks');
     if (bookmarks.length === 0) {
-      alert('No bookmarks to export yet!');
+      showToast('No bookmarks to export yet!');
       return;
     }
 
