@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     let csv = 'Word,Translation,Source Lang,Date\n';
-    bookmarks.forEach(b => { csv += `"${b.w}","${b.t}","${b.sl}","${b.d}"\n`; });
+    bookmarks.forEach(b => { csv += `"${b.w}","${b.t?.text}","${b.sl}","${b.d}"\n`; });
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

@@ -319,8 +319,10 @@
     if (popup && popup.contains(e.target)) return;
 
     const selection = window.getSelection();
-    const word = (selection?.toString() || '').trim();
-    if (!word || word.length > 80) return;
+  const word = (selection?.toString() || '').trim();
+  // Allow translating longer selections (sentences/phrases). Cap at 500 chars to
+  // avoid excessive requests and UI issues.
+  if (!word || word.length > 500) return;
 
     currentWord = word;
     currentTranslation = '';
