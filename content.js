@@ -55,7 +55,7 @@
     el.querySelector('.dep-bookmark-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
       if (currentWord && currentTranslation) {
-        const { bookmarks = [] } = await chrome.storage.local.get('bookmarks');
+        const bookmarks = await loadBookmarks();
         if (!bookmarks.find(b => b.w === currentWord)) {
           bookmarks.push({
             w: currentWord,
@@ -63,7 +63,7 @@
             sl: currentSourceLang,
             d: new Date().toLocaleDateString()
           });
-          await chrome.storage.local.set({ bookmarks });
+          await saveBookmarks(bookmarks);
           el.querySelector('.dep-bookmark-btn').classList.add('active');
         }
       }
@@ -153,6 +153,85 @@
   }
 
   const cache = {};
+
+  // Storage helpers: prefer chrome.storage.sync -> chrome.storage.local -> localStorage
+  async function storageGet(keys) {
+    // keys: string or array
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        if (chrome.storage.sync && chrome.storage.sync.get) {
+          return await chrome.storage.sync.get(keys);
+        }
+        if (chrome.storage.local && chrome.storage.local.get) {
+          return await chrome.storage.local.get(keys);
+        }
+      }
+    } catch (e) {
+      // fallthrough to localStorage
+    }
+
+    // Fallback to localStorage
+    const ks = Array.isArray(keys) ? keys : [keys];
+    const res = {};
+    ks.forEach(k => {
+      try {
+        const raw = localStorage.getItem(k);
+        res[k] = raw ? JSON.parse(raw) : undefined;
+      } catch (e) {
+        res[k] = localStorage.getItem(k);
+      }
+    });
+    return res;
+  }
+
+  async function storageSet(obj) {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        if (chrome.storage.sync && chrome.storage.sync.set) {
+          return await chrome.storage.sync.set(obj);
+        }
+        if (chrome.storage.local && chrome.storage.local.set) {
+          return await chrome.storage.local.set(obj);
+        }
+      }
+    } catch (e) {
+      // fallthrough to localStorage
+    }
+
+    // Fallback to localStorage
+    Object.keys(obj).forEach(k => {
+      try {
+        localStorage.setItem(k, JSON.stringify(obj[k]));
+      } catch (e) {
+        localStorage.setItem(k, String(obj[k]));
+      }
+    });
+  }
+
+  async function storageRemove(key) {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        if (chrome.storage.sync && chrome.storage.sync.remove) {
+          return await chrome.storage.sync.remove(key);
+        }
+        if (chrome.storage.local && chrome.storage.local.remove) {
+          return await chrome.storage.local.remove(key);
+        }
+      }
+    } catch (e) {
+      // fallthrough
+    }
+    try { localStorage.removeItem(key); } catch (e) {}
+  }
+
+  async function loadBookmarks() {
+    const res = await storageGet('bookmarks');
+    return res?.bookmarks || [];
+  }
+
+  async function saveBookmarks(bookmarks) {
+    await storageSet({ bookmarks });
+  }
 
   async function translate(word) {
   const stored = await chrome.storage.local.get(['targetLang', 'sourceLang']);
