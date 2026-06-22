@@ -236,23 +236,25 @@
   async function translate(word) {
   const stored = await chrome.storage.local.get(['targetLang', 'sourceLang']);
   targetLang = stored.targetLang || 'en';
-  sourceLang = stored.sourceLang || 'autodetect'; // Update module-level sourceLang
+  sourceLang = stored.sourceLang || 'autodetect'; // keep module-level sourceLang in sync
 
   const cacheKey = `${word}:${sourceLang}:${targetLang}`;
 
+  // If user explicitly set source == target, return the original word
   if (sourceLang === targetLang) {
     currentSourceLang = sourceLang;
-    return {'text': word, 'srcLang': sourceLang, 'destLang': targetLang};
+    return { text: word, srcLang: sourceLang, destLang: targetLang };
   }
 
   if (cache[cacheKey]) {
     currentSourceLang = cache[cacheKey].sl;
-    let translatedText= cache[cacheKey].t;
-      return {'text': translatedText, 'srcLang': sourceLang, 'destLang': targetLang};
+    return { text: cache[cacheKey].t, srcLang: currentSourceLang, destLang: targetLang };
   }
 
-  // ← MyMemory's keyword for auto-detect is "auto", not "autodetect"
-  const srcCode = (sourceLang === 'autodetect') ? 'autodetect' : sourceLang;
+  // When the user has selected "autodetect" we send the API the keyword it expects: "auto".
+  // However, we do NOT override the user's configured source language with the API-detected
+  // language. This disables the autodetect feature from changing the displayed/used source.
+  const srcCode = (sourceLang === 'autodetect') ? 'auto' : sourceLang;
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${srcCode}|${targetLang}`;
   console.log(`[TransWord] API URL: ${url}`);
 
@@ -266,20 +268,11 @@
   const translation = data?.responseData?.translatedText;
   if (!translation || translation.trim() === '') throw new Error('Empty translation');
 
-  // ← Correct field: responseData.detectedSourceLanguage (not matches[0].source)
-  const detectedLanguageFromApi = data?.responseData?.detectedLanguage;
-  if (sourceLang === 'autodetect' && detectedLanguageFromApi) { // Only use detected language if auto-detect is enabled
-    if (detectedLanguageFromApi.length >= 2) {
-      currentSourceLang = detectedLanguageFromApi.split('-')[0].toLowerCase(); // "DE-DE" → "de"
-    } else {
-      currentSourceLang = detectedLanguageFromApi.toLowerCase();
-    }
-  } else {
-    currentSourceLang = sourceLang; // Use the user's selected sourceLang
-  }
+  // Always respect the configured source language. Do not replace it with API detection.
+  currentSourceLang = sourceLang;
 
   cache[cacheKey] = { t: translation, sl: currentSourceLang };
-  return {'text': translation, 'srcLang': currentSourceLang, 'destLang': targetLang};
+  return { text: translation, srcLang: currentSourceLang, destLang: targetLang };
 }
 
   // ── Pronunciation ─────────────────────────────────────────────────────────
