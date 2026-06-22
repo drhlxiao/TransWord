@@ -234,7 +234,7 @@
   }
 
   async function translate(word) {
-  const stored = await chrome.storage.local.get(['targetLang', 'sourceLang']);
+  const stored = await storageGet(['targetLang', 'sourceLang']);
   targetLang = stored.targetLang || 'en';
   sourceLang = stored.sourceLang || 'autodetect'; // keep module-level sourceLang in sync
 
@@ -251,19 +251,33 @@
     return { text: cache[cacheKey].t, srcLang: currentSourceLang, destLang: targetLang };
   }
 
-  // When the user has selected "autodetect" we send the API the keyword it expects: "auto".
-  // However, we do NOT override the user's configured source language with the API-detected
-  // language. This disables the autodetect feature from changing the displayed/used source.
+  // When the user has selected "autodetect" we attempt to use the API's auto keyword.
+  // Some MyMemory endpoints may reject 'auto'/'AUTO' in the langpair; if that happens
+  // we retry with an empty source (langpair=|TARGET) as a fallback.
   const srcCode = (sourceLang === 'autodetect') ? 'auto' : sourceLang;
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${srcCode}|${targetLang}`;
+  let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${srcCode}|${targetLang}`;
   console.log(`[TransWord] API URL: ${url}`);
 
-  const res = await fetch(url);
+  let res = await fetch(url);
   if (!res.ok) throw new Error(`Network error: ${res.status}`);
-  const data = await res.json();
+  let data = await res.json();
   console.log('[TransWord] API Response:', data);
 
-  if (data.responseStatus !== 200) throw new Error(data.responseDetails || 'API error');
+  // If API returns an error and we used autodetect, retry with an empty source (|target)
+  if (data.responseStatus !== 200) {
+    if (sourceLang === 'autodetect') {
+      // Retry using langpair=|TARGET which some endpoints accept as auto-detect
+      const retryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=|${targetLang}`;
+      console.log(`[TransWord] Retry API URL: ${retryUrl}`);
+      res = await fetch(retryUrl);
+      if (!res.ok) throw new Error(`Network error: ${res.status}`);
+      data = await res.json();
+      console.log('[TransWord] Retry API Response:', data);
+      if (data.responseStatus !== 200) throw new Error(data.responseDetails || 'API error (retry)');
+    } else {
+      throw new Error(data.responseDetails || 'API error');
+    }
+  }
 
   const translation = data?.responseData?.translatedText;
   if (!translation || translation.trim() === '') throw new Error('Empty translation');
